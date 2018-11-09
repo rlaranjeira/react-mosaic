@@ -14,8 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as _ from 'lodash';
-import * as React from 'react';
+import flatten from 'lodash/flatten';
+import React from 'react';
 import { MosaicContext } from './contextTypes';
 import { Split } from './Split';
 import { MosaicBranch, MosaicDirection, MosaicKey, MosaicNode, ResizeOptions, TileRenderer } from './types';
@@ -30,7 +30,7 @@ export interface MosaicRootProps<T extends MosaicKey> {
 
 export class MosaicRoot<T extends MosaicKey> extends React.PureComponent<MosaicRootProps<T>> {
   static contextTypes = MosaicContext;
-  context: MosaicContext<T>;
+  context!: MosaicContext<T>;
 
   render() {
     const { root } = this.props;
@@ -45,7 +45,7 @@ export class MosaicRoot<T extends MosaicKey> extends React.PureComponent<MosaicR
     if (isParent(node)) {
       const splitPercentage = node.splitPercentage == null ? 50 : node.splitPercentage;
       const { first, second } = BoundingBox.split(boundingBox, splitPercentage, node.direction);
-      return _.flatten(
+      return flatten(
         [
           this.renderRecursively(node.first, first, path.concat('first')),
           this.renderSplit(node.direction, boundingBox, splitPercentage, path),

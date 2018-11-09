@@ -9,8 +9,6 @@ react-mosaic is written in TypeScript and provides typings but can be used in Ja
 
 The best way to see it is a simple [**Demo**](https://palantir.github.io/react-mosaic/).
 
-v1.0 just released! Upgrade guide [here](https://github.com/palantir/react-mosaic/releases/tag/v1.0.0).
-
 #### Screencast
 
 [![screencast demo](./screencast.gif)](./screencast.gif)
@@ -41,14 +39,30 @@ See [blueprint-theme.less](./styles/blueprint-theme.less) for an example of crea
 
 #### Blueprint Dark Theme
 
-Mosaic supports the Blueprint Dark Theme out of the box when rendered with the `mosaic-blueprint-theme pt-dark` class.
+Mosaic supports the Blueprint Dark Theme out of the box when rendered with the `mosaic-blueprint-theme bp3-dark` class.
 
 ### Examples
 
 #### Simple Tiling
 
+##### app.css
+
+```css
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+}
+```
+
+##### App.tsx
+
 ```tsx
 import { Mosaic } from 'react-mosaic-component';
+import '@blueprintjs/core/dist/blueprint.css';
+import './app.css';
 
 const ELEMENT_MAP: { [viewId: string]: JSX.Element } = {
   a: <div>Left Window</div>,
@@ -57,19 +71,21 @@ const ELEMENT_MAP: { [viewId: string]: JSX.Element } = {
 };
 
 export const app = (
-  <Mosaic
-    renderTile={(id) => ELEMENT_MAP[id]}
-    initialValue={{
-      direction: 'row',
-      first: 'a',
-      second: {
-        direction: 'column',
-        first: 'b',
-        second: 'c',
-      },
-      splitPercentage: 40,
-    }}
-  />
+  <div id="app">
+    <Mosaic
+      renderTile={(id) => ELEMENT_MAP[id]}
+      initialValue={{
+        direction: 'row',
+        first: 'a',
+        second: {
+          direction: 'column',
+          first: 'b',
+          second: 'c',
+        },
+        splitPercentage: 40,
+      }}
+    />
+  </div>
 );
 ```
 
@@ -132,9 +148,9 @@ These toolbars can be dragged around by a user to rearrange their workspace.
 
 Mosaic views have two modes, similar to `React.DOM` input elements:
 
-* Controlled, where the consumer manages Mosaic's state through callbacks.
+- Controlled, where the consumer manages Mosaic's state through callbacks.
   Using this API, the consumer can perform any operation upon the tree to change the the view as desired.
-* Uncontrolled, where Mosaic manages all of its state internally.
+- Uncontrolled, where Mosaic manages all of its state internally.
 
 See [Controlled Components](https://facebook.github.io/react/docs/forms.html#controlled-components).
 

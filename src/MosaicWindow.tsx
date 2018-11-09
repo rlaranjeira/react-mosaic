@@ -14,9 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as classNames from 'classnames';
-import * as _ from 'lodash';
-import * as React from 'react';
+import { Classes, Icon } from '@blueprintjs/core';
+import { IconNames } from '@blueprintjs/icons';
+import classNames from 'classnames';
+import defer from 'lodash/defer';
+import dropRight from 'lodash/dropRight';
+import isEmpty from 'lodash/isEmpty';
+import isEqual from 'lodash/isEqual';
+import omit from 'lodash/omit';
+import values from 'lodash/values';
+import React from 'react';
 import {
   ConnectDragPreview,
   ConnectDragSource,
@@ -25,6 +32,7 @@ import {
   DragSourceMonitor,
   DropTarget,
 } from 'react-dnd';
+
 import { DEFAULT_CONTROLS_WITH_CREATION, DEFAULT_CONTROLS_WITHOUT_CREATION } from './buttons/defaultToolbarControls';
 import { Separator } from './buttons/Separator';
 import { MosaicContext, MosaicWindowActionsPropType, MosaicWindowContext } from './contextTypes';
@@ -87,7 +95,7 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
         </div>
         <div className="mosaic-window-body">
           <h4>{title}</h4>
-          <span className="pt-icon pt-icon-application" />
+          <Icon iconSize={72} icon="application" />
         </div>
       </div>
     ),
@@ -102,9 +110,9 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
   state: InternalMosaicWindowState = {
     additionalControlsOpen: false,
   };
-  context: MosaicContext<T>;
+  context!: MosaicContext<T>;
 
-  private rootElement: HTMLElement | null;
+  private rootElement: HTMLElement | null = null;
 
   getChildContext(): Partial<MosaicWindowContext<T>> {
     return {
@@ -142,7 +150,7 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
         <div className="mosaic-window-additional-actions-bar">{additionalControls}</div>
         {connectDragPreview(renderPreview!(this.props))}
         <div className="drop-target-container">
-          {_.values<string>(MosaicDropTargetPosition).map(this.renderDropTarget)}
+          {values<MosaicDropTargetPosition>(MosaicDropTargetPosition).map(this.renderDropTarget)}
         </div>
       </div>,
     );
@@ -150,8 +158,8 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
 
   shouldComponentUpdate(nextProps: InternalMosaicWindowProps<T>, nextState: InternalMosaicWindowState): boolean {
     return (
-      !_.isEqual(_.omit(this.props, PURE_RENDER_IGNORE), _.omit(nextProps, PURE_RENDER_IGNORE)) ||
-      !_.isEqual(this.state, nextState)
+      !isEqual(omit(this.props, PURE_RENDER_IGNORE), omit(nextProps, PURE_RENDER_IGNORE)) ||
+      !isEqual(this.state, nextState)
     );
   }
 
@@ -182,17 +190,17 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
       titleDiv = connectDragSource(titleDiv) as React.ReactElement<any>;
     }
 
-    const hasAdditionalControls = !_.isEmpty(additionalControls);
+    const hasAdditionalControls = !isEmpty(additionalControls);
 
     return (
       <div className={classNames('mosaic-window-toolbar', { draggable: draggableAndNotRoot })}>
         {titleDiv}
-        <div className="mosaic-window-controls pt-button-group">
+        <div className={classNames('mosaic-window-controls', Classes.BUTTON_GROUP)}>
           {hasAdditionalControls && (
             <button
               onClick={() => this.setAdditionalControlsOpen(!additionalControlsOpen)}
-              className={classNames('pt-button pt-minimal pt-icon-more', {
-                'pt-active': additionalControlsOpen,
+              className={classNames(Classes.BUTTON, Classes.MINIMAL, Classes.iconClass(IconNames.MORE), {
+                [Classes.ACTIVE]: additionalControlsOpen,
               })}
             >
               <span className="control-text">{additionalControlButtonText!}</span>
@@ -257,7 +265,7 @@ const dragSource = {
   ): MosaicDragItem => {
     // TODO: Actually just delete instead of hiding
     // The defer is necessary as the element must be present on start for HTML DnD to not cry
-    const hideTimer = _.defer(() => component.context.mosaicActions.hide(component.props.path));
+    const hideTimer = defer(() => component.context.mosaicActions.hide(component.props.path));
     return {
       mosaicId: component.context.mosaicId,
       hideTimer,
@@ -276,13 +284,13 @@ const dragSource = {
     const dropResult: MosaicDropData = (monitor.getDropResult() || {}) as MosaicDropData;
     const { mosaicActions } = component.context;
     const { position, path: destinationPath } = dropResult;
-    if (position != null && destinationPath != null && !_.isEqual(destinationPath, ownPath)) {
+    if (position != null && destinationPath != null && !isEqual(destinationPath, ownPath)) {
       mosaicActions.updateTree(createDragToUpdates(mosaicActions.getRoot(), ownPath, destinationPath, position));
     } else {
       // TODO: restore node from captured state
       mosaicActions.updateTree([
         {
-          path: _.dropRight(ownPath),
+          path: dropRight(ownPath),
           spec: {
             splitPercentage: {
               $set: null,
@@ -314,7 +322,7 @@ export const SourceDropConnectedInternalMosaicWindow = DropTarget(
     isOver: monitor.isOver(),
     draggedMosaicId: ((monitor.getItem() || {}) as MosaicDragItem).mosaicId,
   }),
-)(SourceConnectedInternalMosaicWindow);
+)(SourceConnectedInternalMosaicWindow as any);
 
 export class MosaicWindow<T extends MosaicKey = string> extends React.PureComponent<MosaicWindowProps<T>> {
   static ofType<T extends MosaicKey>() {
@@ -332,7 +340,7 @@ export function MosaicWindowFactory<T extends MosaicKey = string>(
   ...children: React.ReactNode[]
 ) {
   const element: React.ReactElement<MosaicWindowProps<T>> = React.createElement(
-    InternalMosaicWindow as React.ComponentClass<MosaicWindowProps<T>>,
+    (InternalMosaicWindow as any) as React.ComponentClass<MosaicWindowProps<T>>,
     props,
     ...children,
   );

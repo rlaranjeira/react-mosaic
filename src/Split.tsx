@@ -14,9 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import * as classNames from 'classnames';
-import * as _ from 'lodash';
-import * as React from 'react';
+import classNames from 'classnames';
+import clamp from 'lodash/clamp';
+import throttle from 'lodash/throttle';
+import React from 'react';
+
 import { EnabledResizeOptions, MosaicDirection } from './types';
 import { BoundingBox } from './util/BoundingBox';
 
@@ -91,7 +93,7 @@ export class Split extends React.PureComponent<SplitProps> {
     }
   };
 
-  private onMouseMove = _.throttle((event: MouseEvent) => {
+  private onMouseMove = throttle((event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -107,13 +109,13 @@ export class Split extends React.PureComponent<SplitProps> {
 
     let absolutePercentage: number;
     if (direction === 'column') {
-      absolutePercentage = (event.clientY - parentBBox.top) / parentBBox.height * 100.0;
+      absolutePercentage = ((event.clientY - parentBBox.top) / parentBBox.height) * 100.0;
     } else {
-      absolutePercentage = (event.clientX - parentBBox.left) / parentBBox.width * 100.0;
+      absolutePercentage = ((event.clientX - parentBBox.left) / parentBBox.width) * 100.0;
     }
 
     const relativePercentage = BoundingBox.getRelativeSplitPercentage(boundingBox, absolutePercentage, direction);
 
-    return _.clamp(relativePercentage, minimumPaneSizePercentage!, 100 - minimumPaneSizePercentage!);
+    return clamp(relativePercentage, minimumPaneSizePercentage!, 100 - minimumPaneSizePercentage!);
   }
 }

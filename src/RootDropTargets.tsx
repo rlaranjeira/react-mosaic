@@ -1,7 +1,8 @@
-import * as classNames from 'classnames';
-import * as _ from 'lodash';
-import * as React from 'react';
+import classNames from 'classnames';
+import values from 'lodash/values';
+import React from 'react';
 import { DropTarget } from 'react-dnd';
+
 import { MosaicDropTargetPosition } from './internalTypes';
 import { MosaicDropTarget } from './MosaicDropTarget';
 import { MosaicDragType } from './types';
@@ -18,7 +19,7 @@ class RootDropTargetsClass extends React.PureComponent<RootDropTargetsProps> {
           '-dragging': this.props.isDragging,
         })}
       >
-        {_.values<MosaicDropTargetPosition>(MosaicDropTargetPosition).map((position) => (
+        {values<MosaicDropTargetPosition>(MosaicDropTargetPosition).map((position) => (
           <MosaicDropTarget position={position} path={[]} key={position} />
         ))}
       </div>
@@ -33,4 +34,4 @@ export const RootDropTargets = DropTarget(
   (_connect, monitor): RootDropTargetsProps => ({
     isDragging: monitor.getItem() !== null && monitor.getItemType() === MosaicDragType.WINDOW,
   }),
-)(RootDropTargetsClass) as React.ComponentClass<{}>;
+)(RootDropTargetsClass as any) as React.ComponentType<{}>;
