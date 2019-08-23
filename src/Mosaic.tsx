@@ -1,27 +1,14 @@
-/**
- * @license
- * Copyright 2016 Palantir Technologies, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import classNames from 'classnames';
+import { BackendFactory } from 'dnd-core';
 import countBy from 'lodash/countBy';
 import keys from 'lodash/keys';
 import pickBy from 'lodash/pickBy';
 import React from 'react';
 import { DragDropContext } from 'react-dnd';
-import HTML5 from 'react-dnd-html5-backend';
+import MultiBackend from 'react-dnd-multi-backend';
+import HTML5toTouch from 'react-dnd-multi-backend/lib/HTML5toTouch';
 import { v4 as uuid } from 'uuid';
+
 import { MosaicContext, MosaicRootActions } from './contextTypes';
 import { MosaicRoot } from './MosaicRoot';
 import { MosaicZeroState } from './MosaicZeroState';
@@ -41,6 +28,10 @@ export interface MosaicBaseProps<T extends MosaicKey> {
    * Called when a user initiates any change to the tree (removing, adding, moving, resizing, etc.)
    */
   onChange?: (newNode: MosaicNode<T> | null) => void;
+  /**
+   * Called when a user completes a change (fires like above except for the interpolation during resizing)
+   */
+  onRelease?: (newNode: MosaicNode<T> | null) => void;
   /**
    * Additional classes to affix to the root element
    * Default: 'mosaic-blueprint-theme'
@@ -81,6 +72,7 @@ function isUncontrolled<T extends MosaicKey>(props: MosaicProps<T>): props is Mo
 
 export interface MosaicState<T extends MosaicKey> {
   currentNode: MosaicNode<T> | null;
+  lastInitialValue: MosaicNode<T> | null;
   mosaicId: string;
 }
 
@@ -94,50 +86,37 @@ export class MosaicWithoutDragDropContext<T extends MosaicKey = string> extends 
     className: 'mosaic-blueprint-theme',
   };
 
-  static childContextTypes = MosaicContext;
+  static getDerivedStateFromProps(
+    nextProps: Readonly<MosaicProps<MosaicKey>>,
+    prevState: MosaicState<MosaicKey>,
+  ): Partial<MosaicState<MosaicKey>> | null {
+    if (isUncontrolled(nextProps) && nextProps.initialValue !== prevState.lastInitialValue) {
+      return {
+        lastInitialValue: nextProps.initialValue,
+        currentNode: nextProps.initialValue,
+      };
+    }
 
-  static ofType<T extends MosaicKey>() {
-    return MosaicWithoutDragDropContext as new (props: MosaicProps<T>, context?: any) => MosaicWithoutDragDropContext<
-      T
-    >;
+    return null;
   }
 
   state: MosaicState<T> = {
     currentNode: null,
+    lastInitialValue: null,
     mosaicId: uuid(),
   };
-
-  getChildContext(): MosaicContext<T> {
-    return {
-      mosaicActions: this.actions,
-      mosaicId: this.state.mosaicId,
-    };
-  }
 
   render() {
     const { className } = this.props;
 
     return (
-      <div className={classNames(className, 'mosaic mosaic-drop-target')}>
-        {this.renderTree()}
-        <RootDropTargets />
-      </div>
+      <MosaicContext.Provider value={this.childContext as MosaicContext<any>}>
+        <div className={classNames(className, 'mosaic mosaic-drop-target')}>
+          {this.renderTree()}
+          <RootDropTargets />
+        </div>
+      </MosaicContext.Provider>
     );
-  }
-
-  componentWillReceiveProps(nextProps: MosaicProps<T>) {
-    if (
-      isUncontrolled(nextProps) &&
-      nextProps.initialValue !== (this.props as MosaicUncontrolledProps<T>).initialValue
-    ) {
-      this.setState({ currentNode: nextProps.initialValue });
-    }
-  }
-
-  componentWillMount() {
-    if (isUncontrolled(this.props)) {
-      this.setState({ currentNode: this.props.initialValue });
-    }
   }
 
   private getRoot(): MosaicNode<T> | null {
@@ -148,14 +127,17 @@ export class MosaicWithoutDragDropContext<T extends MosaicKey = string> extends 
     }
   }
 
-  private updateRoot = (updates: MosaicUpdate<T>[]) => {
+  private updateRoot = (updates: MosaicUpdate<T>[], suppressOnRelease: boolean = false) => {
     const currentNode = this.getRoot() || ({} as MosaicNode<T>);
 
-    this.replaceRoot(updateTree(currentNode, updates));
+    this.replaceRoot(updateTree(currentNode, updates), suppressOnRelease);
   };
 
-  private replaceRoot = (currentNode: MosaicNode<T> | null) => {
+  private replaceRoot = (currentNode: MosaicNode<T> | null, suppressOnRelease: boolean = false) => {
     this.props.onChange!(currentNode);
+    if (!suppressOnRelease && this.props.onRelease) {
+      this.props.onRelease(currentNode);
+    }
 
     if (isUncontrolled(this.props)) {
       this.setState({ currentNode });
@@ -186,6 +168,11 @@ export class MosaicWithoutDragDropContext<T extends MosaicKey = string> extends 
       ]),
   };
 
+  private readonly childContext: MosaicContext<T> = {
+    mosaicActions: this.actions,
+    mosaicId: this.state.mosaicId,
+  };
+
   private renderTree() {
     const root = this.getRoot();
     this.validateTree(root);
@@ -210,22 +197,5 @@ export class MosaicWithoutDragDropContext<T extends MosaicKey = string> extends 
   }
 }
 
-@(DragDropContext(HTML5) as ClassDecorator)
-export class Mosaic<T extends MosaicKey = string> extends MosaicWithoutDragDropContext<T> {
-  static ofType<T extends MosaicKey>() {
-    return Mosaic as new (props: MosaicProps<T>, context?: any) => Mosaic<T>;
-  }
-}
-
-// Factory that works with generics
-export function MosaicFactory<T extends MosaicKey = string>(
-  props: MosaicProps<T> & React.Attributes,
-  ...children: React.ReactNode[]
-) {
-  const element: React.ReactElement<MosaicProps<T>> = React.createElement(
-    Mosaic as React.ComponentClass<MosaicProps<T>>,
-    props,
-    ...children,
-  );
-  return element;
-}
+@(DragDropContext(MultiBackend(HTML5toTouch) as BackendFactory) as ClassDecorator)
+export class Mosaic<T extends MosaicKey = string> extends MosaicWithoutDragDropContext<T> {}

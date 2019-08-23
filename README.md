@@ -1,13 +1,13 @@
 # react-mosaic
 
-[![CircleCI](https://img.shields.io/circleci/project/github/palantir/react-mosaic/master.svg)](https://circleci.com/gh/palantir/react-mosaic)
+[![CircleCI](https://circleci.com/gh/nomcopter/react-mosaic/tree/master.svg?style=svg)](https://circleci.com/gh/nomcopter/react-mosaic/tree/master)
 [![npm](https://img.shields.io/npm/v/react-mosaic-component.svg)](https://www.npmjs.com/package/react-mosaic-component)
 
 react-mosaic is a full-featured React Tiling Window Manager meant to give a user complete control over their workspace.
 It provides a simple and flexible API to tile arbitrarily complex react components across a user's view.
 react-mosaic is written in TypeScript and provides typings but can be used in JavaScript as well.
 
-The best way to see it is a simple [**Demo**](https://palantir.github.io/react-mosaic/).
+The best way to see it is a simple [**Demo**](https://nomcopter.github.io/react-mosaic/).
 
 #### Screencast
 
@@ -15,8 +15,8 @@ The best way to see it is a simple [**Demo**](https://palantir.github.io/react-m
 
 ## Usage
 
-The core of react-mosaic's operations revolve around the simple binary tree [specified by `MosaicNode<T>`](./src/types.ts#L27).
-[`T`](./src/types.ts#L22) is the type of the leaves of the tree and is a `string` or a `number` that can be resolved to a `JSX.Element` for display.
+The core of react-mosaic's operations revolve around the simple binary tree [specified by `MosaicNode<T>`](./src/types.ts#L12).
+[`T`](./src/types.ts#L7) is the type of the leaves of the tree and is a `string` or a `number` that can be resolved to a `JSX.Element` for display.
 
 ### Installation
 
@@ -93,7 +93,7 @@ export const app = (
 `renderTile` is a stateless lookup function to convert `T` into a displayable `JSX.Element`.
 By default `T` is `string` (so to render one element `initialValue="ID"` works).
 `T`s must be unique within an instance of `Mosaic`, they are used as keys for [React list management](https://reactjs.org/docs/lists-and-keys.html).
-`initialValue` is a [`MosaicNode<T>`](./src/types.ts#L27).
+`initialValue` is a [`MosaicNode<T>`](./src/types.ts#L12).
 
 The user can resize these panes but there is no other advanced functionality.
 This example renders a simple tiled interface with one element on the left half, and two stacked elements on the right half.
@@ -152,17 +152,9 @@ See [Controlled Components](https://facebook.github.io/react/docs/forms.html#con
 
 All of the previous examples show use of Mosaic in an Uncontrolled fashion.
 
-#### TS/JS vs. TSX/JSX
-
-Components export both factories and component classes.
-If you are using TS/JS then use the factories;
-if you are using TSX/JSX then use the exported class but know that you will lose the generics if you aren't careful.
-The exported classes are named as the base name of the component (e.g. `MosaicWindow`) while the exported factories
-have 'Factory' appended (e.g. `MosaicWindowFactory`).
-
 #### Example Application
 
-See [ExampleApp](demo/ExampleApp.tsx) (the application used in the [Demo](https://palantir.github.io/react-mosaic/))
+See [ExampleApp](demo/ExampleApp.tsx) (the application used in the [Demo](https://nomcopter.github.io/react-mosaic/))
 for a more interesting example that shows the usage of Mosaic as a controlled component and modifications of the tree structure.
 
 ## API
@@ -179,6 +171,10 @@ export interface MosaicBaseProps<T extends MosaicKey> {
    * Called when a user initiates any change to the tree (removing, adding, moving, resizing, etc.)
    */
   onChange?: (newNode: MosaicNode<T> | null) => void;
+  /**
+   * Called when a user completes a change (fires like above except for the interpolation during resizing)
+   */
+  onRelease?: (newNode: MosaicNode<T> | null) => void;
   /**
    * Additional classes to affix to the root element
    * Default: 'mosaic-blueprint-theme'
@@ -250,6 +246,18 @@ export interface MosaicWindowProps<T extends MosaicKey> {
    * Optional method to override the displayed preview when a user drags a window
    */
   renderPreview?: (props: MosaicWindowProps<T>) => JSX.Element;
+  /**
+   * Optional method to override the displayed toolbar
+   */
+  renderToolbar?: ((props: MosaicWindowProps<T>, draggable: boolean | undefined) => JSX.Element) | null;
+  /**
+   * Optional listener for when the user begins dragging the window
+   */
+  onDragStart?: () => void;
+  /**
+   * Optional listener for when the user finishes dragging a window.
+   */
+  onDragEnd?: (type: 'drop' | 'reset') => void;
 }
 ```
 
@@ -304,8 +312,9 @@ export interface MosaicRootActions<T extends MosaicKey> {
   /**
    * Atomically applies all updates to the current tree
    * @param updates
+   * @param suppressOnRelease (default: false)
    */
-  updateTree: (updates: MosaicUpdate<T>[]) => void;
+  updateTree: (updates: MosaicUpdate<T>[], suppressOnRelease?: boolean) => void;
   /**
    * Returns the root of this Mosaic instance
    */
@@ -341,23 +350,14 @@ export interface MosaicWindowActions {
    * Returns the path to this window
    */
   getPath: () => MosaicPath;
+  /**
+   * Enables connecting a different drag source besides the react-mosaic toolbar
+   */
+  connectDragSource: (connectedElements: React.ReactElement<any>) => React.ReactElement<any>;
 }
 ```
 
-To access the functions on context simply specify `contextTypes` on your component.
-
-```tsx
-class RemoveButton extends React.PureComponent<Props> {
-  static contextTypes = MosaicWindowContext;
-  context: MosaicWindowContext<TileId>;
-
-  render() {
-    return <button onClick={this.remove}>╳</button>;
-  }
-
-  private remove = () => this.context.mosaicActions.remove(this.context.mosaicWindowActions.getPath());
-}
-```
+To access the functions on context simply use a [`Context.Consumer`](https://reactjs.org/docs/context.html#contextconsumer).
 
 ### Mutating the Tree
 
@@ -366,35 +366,17 @@ Utilities are provided for working with the MosaicNode tree in [`mosaicUtilities
 
 #### MosaicUpdate
 
-[`MosaicUpdateSpec`](./src/types.ts#L48) is an argument meant to be passed to [`immutability-helper`](https://github.com/kolodny/immutability-helper)
+[`MosaicUpdateSpec`](./src/types.ts#L33) is an argument meant to be passed to [`immutability-helper`](https://github.com/kolodny/immutability-helper)
 to modify the state at a path.
 [`mosaicUpdates`](src/util/mosaicUpdates.ts) has examples.
 
-```
-/**
- * Used by many utility methods to update the tree.
- * spec will be passed to https://github.com/kolodny/immutability-helper
- */
-export interface MosaicUpdateSpec<T extends MosaicKey> {
-    $set?: MosaicNode<T>;
-    splitPercentage?: {
-        $set: number | null;
-    };
-    direction?: {
-        $set: MosaicDirection;
-    }
-    first?: MosaicUpdateSpec<T>;
-    second?: MosaicUpdateSpec<T>;
-}
-```
-
 ## Upgrade Considerations / Changelog
 
-See [Releases](https://github.com/palantir/react-mosaic/releases)
+See [Releases](https://github.com/nomcopter/react-mosaic/releases)
 
 ## License
 
-Copyright 2016 Palantir Technologies
+Copyright 2019 Kevin Verdieck, originally developed at Palantir Technologies, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

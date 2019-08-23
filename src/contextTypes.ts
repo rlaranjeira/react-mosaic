@@ -1,20 +1,5 @@
-/**
- * @license
- * Copyright 2016 Palantir Technologies, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-import PropTypes from 'prop-types';
+import React from 'react';
+
 import { MosaicKey, MosaicNode, MosaicPath, MosaicUpdate } from './types';
 
 /**
@@ -33,7 +18,7 @@ export interface MosaicContext<T extends MosaicKey> {
 /**
  * Context provided to everything within a Mosaic Window
  */
-export interface MosaicWindowContext<T extends MosaicKey> extends MosaicContext<T> {
+export interface MosaicWindowContext {
   mosaicWindowActions: MosaicWindowActions;
 }
 
@@ -66,8 +51,9 @@ export interface MosaicRootActions<T extends MosaicKey> {
   /**
    * Atomically applies all updates to the current tree
    * @param updates
+   * @param suppressOnRelease (default: false)
    */
-  updateTree: (updates: MosaicUpdate<T>[]) => void;
+  updateTree: (updates: MosaicUpdate<T>[], suppressOnRelease?: boolean) => void;
   /**
    * Returns the root of this Mosaic instance
    */
@@ -95,38 +81,11 @@ export interface MosaicWindowActions {
    * Returns the path to this window
    */
   getPath: () => MosaicPath;
+  /**
+   * Enables connecting a different drag source besides the react-mosaic toolbar
+   */
+  connectDragSource: (connectedElements: React.ReactElement<any>) => React.ReactElement | null;
 }
 
-/*************************************************************
- * PropTypes for React `contextTypes`
- */
-
-export const MosaicActionsPropType = PropTypes.shape({
-  expand: PropTypes.func.isRequired,
-  remove: PropTypes.func.isRequired,
-  hide: PropTypes.func.isRequired,
-  replaceWith: PropTypes.func.isRequired,
-  updateTree: PropTypes.func.isRequired,
-  getRoot: PropTypes.func.isRequired,
-}).isRequired;
-
-export const MosaicWindowActionsPropType = PropTypes.shape({
-  split: PropTypes.func.isRequired,
-  replaceWithNew: PropTypes.func.isRequired,
-  setAdditionalControlsOpen: PropTypes.func.isRequired,
-  getPath: PropTypes.func.isRequired,
-}).isRequired;
-
-/*************************************************************
- * Bundled PropTypes for convenience
- */
-
-export const MosaicContext = {
-  mosaicActions: MosaicActionsPropType,
-  mosaicId: PropTypes.string.isRequired,
-};
-
-export const MosaicWindowContext = {
-  ...MosaicContext,
-  mosaicWindowActions: MosaicWindowActionsPropType,
-};
+export const MosaicContext = React.createContext<MosaicContext<MosaicKey>>(undefined!);
+export const MosaicWindowContext = React.createContext<MosaicWindowContext>(undefined!);

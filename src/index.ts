@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2016 Palantir Technologies, Inc.
+ * Copyright 2019 Kevin Verdieck, originally developed at Palantir Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ export {
   MosaicProps,
   MosaicUncontrolledProps,
   MosaicControlledProps,
-  MosaicFactory,
   MosaicWithoutDragDropContext,
 } from './Mosaic';
 export {
@@ -34,14 +33,7 @@ export {
   MosaicUpdateSpec,
   TileRenderer,
 } from './types';
-export {
-  MosaicContext,
-  MosaicActionsPropType,
-  MosaicRootActions,
-  MosaicWindowActions,
-  MosaicWindowActionsPropType,
-  MosaicWindowContext,
-} from './contextTypes';
+export { MosaicContext, MosaicRootActions, MosaicWindowActions, MosaicWindowContext } from './contextTypes';
 export {
   buildSpecFromUpdate,
   createDragToUpdates,
@@ -61,12 +53,12 @@ export {
   getPathToCorner,
   isParent,
 } from './util/mosaicUtilities';
-export { MosaicWindow, MosaicWindowFactory, MosaicWindowProps } from './MosaicWindow';
+export { MosaicWindow, MosaicWindowProps } from './MosaicWindow';
 export { createDefaultToolbarButton, MosaicButtonProps } from './buttons/MosaicButton';
-export { MosaicZeroState, MosaicZeroStateFactory, MosaicZeroStateProps } from './MosaicZeroState';
-export { Separator, SeparatorFactory } from './buttons/Separator';
-export { ExpandButton, ExpandButtonFactory } from './buttons/ExpandButton';
-export { ReplaceButton, ReplaceButtonFactory } from './buttons/ReplaceButton';
-export { SplitButton, SplitButtonFactory } from './buttons/SplitButton';
-export { RemoveButton, RemoveButtonFactory } from './buttons/RemoveButton';
+export { MosaicZeroState, MosaicZeroStateProps } from './MosaicZeroState';
+export { Separator } from './buttons/Separator';
+export { ExpandButton } from './buttons/ExpandButton';
+export { ReplaceButton } from './buttons/ReplaceButton';
+export { SplitButton } from './buttons/SplitButton';
+export { RemoveButton } from './buttons/RemoveButton';
 export { DEFAULT_CONTROLS_WITH_CREATION, DEFAULT_CONTROLS_WITHOUT_CREATION } from './buttons/defaultToolbarControls';

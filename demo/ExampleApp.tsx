@@ -1,19 +1,3 @@
-/**
- * @license
- * Copyright 2016 Palantir Technologies, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import { Classes, HTMLSelect } from '@blueprintjs/core';
 import { IconNames } from '@blueprintjs/icons';
 import classNames from 'classnames';
@@ -43,6 +27,8 @@ import '@blueprintjs/icons/lib/css/blueprint-icons.css';
 import '../styles/index.less';
 import './example.less';
 
+// tslint:disable no-console
+
 // tslint:disable-next-line no-var-requires
 const gitHubLogo = require('./GitHub-Mark-Light-32px.png');
 // tslint:disable-next-line no-var-requires
@@ -67,9 +53,6 @@ export interface ExampleAppState {
   currentTheme: Theme;
 }
 
-const NumberMosaic = Mosaic.ofType<number>();
-const NumberMosaicWindow = MosaicWindow.ofType<number>();
-
 export class ExampleApp extends React.PureComponent<{}, ExampleAppState> {
   state: ExampleAppState = {
     currentNode: {
@@ -87,31 +70,43 @@ export class ExampleApp extends React.PureComponent<{}, ExampleAppState> {
 
   render() {
     return (
-      <div className="react-mosaic-example-app">
-        {this.renderNavBar()}
-        <NumberMosaic
-          renderTile={(count, path) => (
-            <NumberMosaicWindow
-              additionalControls={count === 3 ? additionalControls : EMPTY_ARRAY}
-              title={`Window ${count}`}
-              createNode={this.createNode}
-              path={path}
-            >
-              <div className="example-window">
-                <h1>{`Window ${count}`}</h1>
-              </div>
-            </NumberMosaicWindow>
-          )}
-          zeroStateView={<MosaicZeroState createNode={this.createNode} />}
-          value={this.state.currentNode}
-          onChange={this.onChange}
-          className={THEMES[this.state.currentTheme]}
-        />
-      </div>
+      <React.StrictMode>
+        <div className="react-mosaic-example-app">
+          {this.renderNavBar()}
+          <Mosaic<number>
+            renderTile={(count, path) => (
+              <MosaicWindow<number>
+                additionalControls={count === 3 ? additionalControls : EMPTY_ARRAY}
+                title={`Window ${count}`}
+                createNode={this.createNode}
+                path={path}
+                onDragStart={() => console.log('MosaicWindow.onDragStart')}
+                onDragEnd={(type) => console.log('MosaicWindow.onDragEnd', type)}
+                renderToolbar={count === 2 ? () => <div className="toolbar-example">Custom Toolbar</div> : null}
+              >
+                <div className="example-window">
+                  <h1>{`Window ${count}`}</h1>
+                </div>
+              </MosaicWindow>
+            )}
+            zeroStateView={<MosaicZeroState createNode={this.createNode} />}
+            value={this.state.currentNode}
+            onChange={this.onChange}
+            onRelease={this.onRelease}
+            className={THEMES[this.state.currentTheme]}
+          />
+        </div>
+      </React.StrictMode>
     );
   }
 
-  private onChange = (currentNode: MosaicNode<number> | null) => this.setState({ currentNode });
+  private onChange = (currentNode: MosaicNode<number> | null) => {
+    this.setState({ currentNode });
+  };
+
+  private onRelease = (currentNode: MosaicNode<number> | null) => {
+    console.log('Mosaic.onRelease():', currentNode);
+  };
 
   private createNode = () => ++windowCount;
 
@@ -164,9 +159,8 @@ export class ExampleApp extends React.PureComponent<{}, ExampleAppState> {
     return (
       <div className={classNames(Classes.NAVBAR, Classes.DARK)}>
         <div className={Classes.NAVBAR_GROUP}>
-          <div className="pt-logo" />
           <div className={Classes.NAVBAR_HEADING}>
-            <a href="https://github.com/palantir/react-mosaic">
+            <a href="https://github.com/nomcopter/react-mosaic">
               react-mosaic <span className="version">v{version}</span>
             </a>
           </div>
@@ -195,7 +189,7 @@ export class ExampleApp extends React.PureComponent<{}, ExampleAppState> {
           >
             Add Window to Top Right
           </button>
-          <a className="github-link" href="https://github.com/palantir/react-mosaic">
+          <a className="github-link" href="https://github.com/nomcopter/react-mosaic">
             <img src={gitHubLogo} />
           </a>
         </div>

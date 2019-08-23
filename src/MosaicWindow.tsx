@@ -1,25 +1,8 @@
-/**
- * @license
- * Copyright 2016 Palantir Technologies, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 import classNames from 'classnames';
 import defer from 'lodash/defer';
 import dropRight from 'lodash/dropRight';
 import isEmpty from 'lodash/isEmpty';
 import isEqual from 'lodash/isEqual';
-import omit from 'lodash/omit';
 import values from 'lodash/values';
 import React from 'react';
 import {
@@ -33,7 +16,7 @@ import {
 
 import { DEFAULT_CONTROLS_WITH_CREATION, DEFAULT_CONTROLS_WITHOUT_CREATION } from './buttons/defaultToolbarControls';
 import { Separator } from './buttons/Separator';
-import { MosaicContext, MosaicWindowActionsPropType, MosaicWindowContext } from './contextTypes';
+import { MosaicContext, MosaicWindowContext } from './contextTypes';
 import { MosaicDragItem, MosaicDropData, MosaicDropTargetPosition } from './internalTypes';
 import { MosaicDropTarget } from './MosaicDropTarget';
 import { CreateNode, MosaicBranch, MosaicDirection, MosaicDragType, MosaicKey } from './types';
@@ -51,6 +34,9 @@ export interface MosaicWindowProps<T extends MosaicKey> {
   draggable?: boolean;
   createNode?: CreateNode<T>;
   renderPreview?: (props: MosaicWindowProps<T>) => JSX.Element;
+  renderToolbar?: ((props: MosaicWindowProps<T>, draggable: boolean | undefined) => JSX.Element) | null;
+  onDragStart?: () => void;
+  onDragEnd?: (type: 'drop' | 'reset') => void;
 }
 
 export interface InternalDragSourceProps {
@@ -72,14 +58,6 @@ export interface InternalMosaicWindowState {
   additionalControlsOpen: boolean;
 }
 
-const PURE_RENDER_IGNORE: (keyof InternalMosaicWindowProps<any> | 'children')[] = [
-  'path',
-  'connectDropTarget',
-  'connectDragSource',
-  'connectDragPreview',
-  'children',
-];
-
 export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
   InternalMosaicWindowProps<T>,
   InternalMosaicWindowState
@@ -98,31 +76,16 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
         </div>
       </div>
     ),
+    renderToolbar: null,
   };
-
-  static contextTypes = MosaicContext;
-
-  static childContextTypes = {
-    mosaicWindowActions: MosaicWindowActionsPropType,
-  };
+  static contextType = MosaicContext;
+  context!: MosaicContext<T>;
 
   state: InternalMosaicWindowState = {
     additionalControlsOpen: false,
   };
-  context!: MosaicContext<T>;
 
   private rootElement: HTMLElement | null = null;
-
-  getChildContext(): Partial<MosaicWindowContext<T>> {
-    return {
-      mosaicWindowActions: {
-        split: this.split,
-        replaceWithNew: this.swap,
-        setAdditionalControlsOpen: this.setAdditionalControlsOpen,
-        getPath: this.getPath,
-      },
-    };
-  }
 
   render() {
     const {
@@ -135,30 +98,27 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
       draggedMosaicId,
     } = this.props;
 
-    return connectDropTarget(
-      <div
-        className={classNames('mosaic-window mosaic-drop-target', className, {
-          'drop-target-hover': isOver && draggedMosaicId === this.context.mosaicId,
-          'additional-controls-open': this.state.additionalControlsOpen,
-        })}
-        ref={(element) => (this.rootElement = element)}
-      >
-        {this.renderToolbar()}
-        <div className="mosaic-window-body">{this.props.children!}</div>
-        <div className="mosaic-window-body-overlay" onClick={() => this.setAdditionalControlsOpen(false)} />
-        <div className="mosaic-window-additional-actions-bar">{additionalControls}</div>
-        {connectDragPreview(renderPreview!(this.props))}
-        <div className="drop-target-container">
-          {values<MosaicDropTargetPosition>(MosaicDropTargetPosition).map(this.renderDropTarget)}
-        </div>
-      </div>,
-    );
-  }
-
-  shouldComponentUpdate(nextProps: InternalMosaicWindowProps<T>, nextState: InternalMosaicWindowState): boolean {
     return (
-      !isEqual(omit(this.props, PURE_RENDER_IGNORE), omit(nextProps, PURE_RENDER_IGNORE)) ||
-      !isEqual(this.state, nextState)
+      <MosaicWindowContext.Provider value={this.childContext}>
+        {connectDropTarget(
+          <div
+            className={classNames('mosaic-window mosaic-drop-target', className, {
+              'drop-target-hover': isOver && draggedMosaicId === this.context.mosaicId,
+              'additional-controls-open': this.state.additionalControlsOpen,
+            })}
+            ref={(element) => (this.rootElement = element)}
+          >
+            {this.renderToolbar()}
+            <div className="mosaic-window-body">{this.props.children!}</div>
+            <div className="mosaic-window-body-overlay" onClick={() => this.setAdditionalControlsOpen(false)} />
+            <div className="mosaic-window-additional-actions-bar">{additionalControls}</div>
+            {connectDragPreview(renderPreview!(this.props))}
+            <div className="drop-target-container">
+              {values<MosaicDropTargetPosition>(MosaicDropTargetPosition).map(this.renderDropTarget)}
+            </div>
+          </div>,
+        )}
+      </MosaicWindowContext.Provider>
     );
   }
 
@@ -174,20 +134,26 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
   }
 
   private renderToolbar() {
-    const { title, draggable, additionalControls, additionalControlButtonText, connectDragSource, path } = this.props;
+    const { title, draggable, additionalControls, additionalControlButtonText, path, renderToolbar } = this.props;
     const { additionalControlsOpen } = this.state;
     const toolbarControls = this.getToolbarControls();
+    const draggableAndNotRoot = draggable && path.length > 0;
+    const connectIfDraggable = draggableAndNotRoot ? this.props.connectDragSource : (el: React.ReactElement) => el;
 
-    let titleDiv: React.ReactElement<any> = (
+    if (renderToolbar) {
+      const connectedToolbar = connectIfDraggable(renderToolbar(this.props, draggable)) as React.ReactElement<any>;
+      return (
+        <div className={classNames('mosaic-window-toolbar', { draggable: draggableAndNotRoot })}>
+          {connectedToolbar}
+        </div>
+      );
+    }
+
+    const titleDiv = connectIfDraggable(
       <div title={title} className="mosaic-window-title">
         {title}
-      </div>
-    );
-
-    const draggableAndNotRoot = draggable && path.length > 0;
-    if (draggableAndNotRoot) {
-      titleDiv = connectDragSource(titleDiv) as React.ReactElement<any>;
-    }
+      </div>,
+    )!;
 
     const hasAdditionalControls = !isEmpty(additionalControls);
 
@@ -258,14 +224,32 @@ export class InternalMosaicWindow<T extends MosaicKey> extends React.Component<
   };
 
   private getPath = () => this.props.path;
+
+  private connectDragSource = (connectedElements: React.ReactElement<any>) => {
+    const { connectDragSource } = this.props;
+    return connectDragSource(connectedElements);
+  };
+
+  private readonly childContext: MosaicWindowContext = {
+    mosaicWindowActions: {
+      split: this.split,
+      replaceWithNew: this.swap,
+      setAdditionalControlsOpen: this.setAdditionalControlsOpen,
+      getPath: this.getPath,
+      connectDragSource: this.connectDragSource,
+    },
+  };
 }
 
 const dragSource = {
   beginDrag: (
-    _props: InternalMosaicWindowProps<any>,
+    props: InternalMosaicWindowProps<any>,
     _monitor: DragSourceMonitor,
     component: InternalMosaicWindow<any>,
   ): MosaicDragItem => {
+    if (props.onDragStart) {
+      props.onDragStart();
+    }
     // TODO: Actually just delete instead of hiding
     // The defer is necessary as the element must be present on start for HTML DnD to not cry
     const hideTimer = defer(() => component.context.mosaicActions.hide(component.props.path));
@@ -275,7 +259,7 @@ const dragSource = {
     };
   },
   endDrag: (
-    _props: InternalMosaicWindowProps<any>,
+    props: InternalMosaicWindowProps<any>,
     monitor: DragSourceMonitor,
     component: InternalMosaicWindow<any>,
   ) => {
@@ -289,6 +273,9 @@ const dragSource = {
     const { position, path: destinationPath } = dropResult;
     if (position != null && destinationPath != null && !isEqual(destinationPath, ownPath)) {
       mosaicActions.updateTree(createDragToUpdates(mosaicActions.getRoot(), ownPath, destinationPath, position));
+      if (props.onDragEnd) {
+        props.onDragEnd('drop');
+      }
     } else {
       // TODO: restore node from captured state
       mosaicActions.updateTree([
@@ -301,6 +288,9 @@ const dragSource = {
           },
         },
       ]);
+      if (props.onDragEnd) {
+        props.onDragEnd('reset');
+      }
     }
   },
 };
@@ -328,24 +318,7 @@ export const SourceDropConnectedInternalMosaicWindow = DropTarget(
 )(SourceConnectedInternalMosaicWindow as any);
 
 export class MosaicWindow<T extends MosaicKey = string> extends React.PureComponent<MosaicWindowProps<T>> {
-  static ofType<T extends MosaicKey>() {
-    return MosaicWindow as new (props: MosaicWindowProps<T>, context?: any) => MosaicWindow<T>;
-  }
-
   render() {
-    return <SourceDropConnectedInternalMosaicWindow {...this.props as InternalMosaicWindowProps<T>} />;
+    return <SourceDropConnectedInternalMosaicWindow {...(this.props as InternalMosaicWindowProps<T>)} />;
   }
-}
-
-// Factory that works with generics
-export function MosaicWindowFactory<T extends MosaicKey = string>(
-  props: MosaicWindowProps<T> & React.Attributes,
-  ...children: React.ReactNode[]
-) {
-  const element: React.ReactElement<MosaicWindowProps<T>> = React.createElement(
-    (InternalMosaicWindow as any) as React.ComponentClass<MosaicWindowProps<T>>,
-    props,
-    ...children,
-  );
-  return element;
 }
